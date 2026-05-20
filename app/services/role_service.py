@@ -271,7 +271,57 @@ def get_students_with_roles_for_case(
         if not students:
             return True, [], "No hay estudiantes con rol asignado para este caso."
 
-        return True, students, "Estudiantes con rol cargados correctamente."
+        active_students = []
+        for student in students:
+            email = str(student.get("email") or "").strip().lower()
+            profile_id = str(student.get("profile_id") or "").strip()
+
+            if not email or not profile_id:
+                continue
+
+            allowed_result = (
+                client.rpc(
+                    "get_allowed_user_by_email_secure",
+                    {"p_email": email},
+                )
+                .execute()
+            )
+            allowed_rows = allowed_result.data or []
+            allowed_user = allowed_rows[0] if allowed_rows else {}
+
+            if allowed_user.get("is_active") is not True:
+                continue
+
+            if str(allowed_user.get("user_type") or "").strip().lower() != "student":
+                continue
+
+            assignment_result = (
+                client.rpc(
+                    "get_role_assignment_for_user_case_secure",
+                    {
+                        "p_profile_id": profile_id,
+                        "p_case_id": str(case_id).strip(),
+                    },
+                )
+                .execute()
+            )
+            assignment_rows = assignment_result.data or []
+            assignment = assignment_rows[0] if assignment_rows else {}
+
+            if (
+                str(assignment.get("participation_status") or "")
+                .strip()
+                .lower()
+                != "active"
+            ):
+                continue
+
+            active_students.append(student)
+
+        if not active_students:
+            return True, [], "No hay estudiantes activos con rol asignado para este caso."
+
+        return True, active_students, "Estudiantes activos con rol cargados correctamente."
 
     except Exception as exc:  # noqa: BLE001
         return False, [], (

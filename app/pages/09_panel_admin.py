@@ -113,6 +113,17 @@ if not ok_review_interventions:
     st.warning(review_interventions_message)
     review_interventions = []
 
+active_student_profile_ids = {
+    str(student.get("profile_id"))
+    for student in students_real
+    if student.get("profile_id")
+}
+review_interventions = [
+    intervention
+    for intervention in review_interventions
+    if str(intervention.get("author_id") or "") in active_student_profile_ids
+]
+
 ok_ai_reviews, ai_reviews, ai_reviews_message = get_ai_reviews_for_case(case_id)
 if not ok_ai_reviews:
     st.warning(ai_reviews_message)
