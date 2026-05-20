@@ -1,0 +1,1 @@
+"""Componente base: cards.py."""

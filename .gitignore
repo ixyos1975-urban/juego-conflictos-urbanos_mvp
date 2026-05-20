@@ -1,0 +1,15 @@
+# Entorno
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Sistema
+.DS_Store
+Thumbs.db

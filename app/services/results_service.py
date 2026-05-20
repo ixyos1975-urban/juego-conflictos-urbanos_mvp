@@ -1,0 +1,1 @@
+"""Servicio base para resultados."""
