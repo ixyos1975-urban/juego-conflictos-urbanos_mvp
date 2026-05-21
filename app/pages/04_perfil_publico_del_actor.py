@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 try:
+    from services.case_service import is_case_interaction_closed
     from services.progress_service import upsert_student_progress
     from services.profile_service import (
         build_empty_profile,
@@ -13,6 +14,7 @@ try:
     )
     from ui_styles import apply_compact_academic_style
 except ModuleNotFoundError:
+    from app.services.case_service import is_case_interaction_closed
     from app.services.progress_service import upsert_student_progress
     from app.services.profile_service import (
         build_empty_profile,
@@ -112,6 +114,9 @@ if loaded_profile_cache_key != profile_cache_key:
 profile = st.session_state["public_actor_profile"]
 profile_status = profile.get("profile_status") or "draft"
 profile_is_submitted = profile_status == "submitted"
+case_record = st.session_state.get("case_record", {}) or {}
+case_interaction_closed = is_case_interaction_closed(case_record)
+profile_is_read_only = profile_is_submitted or case_interaction_closed
 
 st.success(
     "Flujo correcto: acceso validado, guía leída, contexto revisado "
@@ -139,11 +144,17 @@ st.info(
 # ---------------------------------------------------------
 st.header("2. Construcción del perfil público")
 
-if profile_is_submitted:
-    st.success(
-        "Estado del perfil: enviado definitivamente. "
-        "El perfil está bloqueado para edición."
-    )
+if profile_is_read_only:
+    if profile_is_submitted:
+        st.success(
+            "Estado del perfil: enviado definitivamente. "
+            "El perfil está bloqueado para edición."
+        )
+    elif case_interaction_closed:
+        st.warning(
+            "Ejercicio cerrado: el perfil público queda disponible solo para "
+            "consulta y ya no puede modificarse."
+        )
     st.info("El perfil se muestra en modo lectura.")
 else:
     st.info("Estado del perfil: borrador editable.")

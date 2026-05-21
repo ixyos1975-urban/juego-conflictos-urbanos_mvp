@@ -6,6 +6,7 @@ para que las pantallas no repitan consultas ni lógica de validación.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Tuple
 
 # Import flexible para que el archivo funcione tanto si la app corre
@@ -14,6 +15,20 @@ try:
     from services.supabase_client import get_supabase_client
 except ModuleNotFoundError:
     from app.services.supabase_client import get_supabase_client
+
+
+COLOMBIA_TZ = timezone(timedelta(hours=-5), name="America/Bogota")
+CASE_INTERACTION_CLOSES_AT = datetime(2026, 5, 30, 23, 59, tzinfo=COLOMBIA_TZ)
+CASE_CLOSED_STATUSES = {
+    "closed",
+    "cerrado",
+    "cerrada",
+    "finalizado",
+    "finalizada",
+    "archived",
+    "archivado",
+    "archivada",
+}
 
 
 def _safe_float(value: Any) -> Optional[float]:
@@ -25,6 +40,17 @@ def _safe_float(value: Any) -> Optional[float]:
         return float(value)
     except (TypeError, ValueError):
         return None
+
+
+def is_case_interaction_closed(case_record: Optional[Dict[str, Any]]) -> bool:
+    """Indica si el estudiante debe quedar en modo solo lectura."""
+    case_record = case_record or {}
+    status = str(case_record.get("status") or "").strip().lower()
+
+    if status in CASE_CLOSED_STATUSES:
+        return True
+
+    return datetime.now(COLOMBIA_TZ) >= CASE_INTERACTION_CLOSES_AT
 
 
 def get_case_by_slug(case_slug: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:

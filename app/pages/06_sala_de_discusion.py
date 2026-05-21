@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 try:
+    from services.case_service import is_case_interaction_closed
     from services.discussion_service import (
         create_intervention,
         get_interventions_for_thread,
@@ -10,6 +11,7 @@ try:
     )
     from ui_styles import apply_compact_academic_style
 except ModuleNotFoundError:
+    from app.services.case_service import is_case_interaction_closed
     from app.services.discussion_service import (
         create_intervention,
         get_interventions_for_thread,
@@ -79,6 +81,8 @@ assigned_role = st.session_state.get("assigned_role", {}) or {}
 profile_id = st.session_state.get("profile_id", "")
 case_id = st.session_state.get("case_id", "")
 role_id = st.session_state.get("role_id", "")
+case_record = st.session_state.get("case_record", {}) or {}
+case_interaction_closed = is_case_interaction_closed(case_record)
 
 if not profile_id or not case_id or not role_id:
     st.error(
@@ -86,6 +90,15 @@ if not profile_id or not case_id or not role_id:
         "cargar la sala de discusión."
     )
     st.stop()
+
+if case_interaction_closed:
+    st.session_state.pop("reply_to_intervention_id", None)
+    st.session_state.pop("reply_to_intervention_label", None)
+    st.session_state.pop("reply_to_intervention_type", None)
+    st.warning(
+        "Ejercicio cerrado: la sala queda disponible en modo solo lectura. "
+        "Ya no es posible publicar nuevas intervenciones ni responder."
+    )
 
 ok_threads, threads, threads_message = get_threads_for_case(case_id)
 
@@ -231,7 +244,7 @@ def render_intervention_card(post, is_reply=False, interaction_state=None):
 
         reply_label = build_reply_label(post, author_label, role_label)
 
-        if st.button(
+        if not case_interaction_closed and st.button(
             "Responder a esta intervención",
             key=f"reply_to_{post['id']}",
             use_container_width=True,
@@ -298,6 +311,12 @@ else:
 st.divider()
 st.header("3. Publicar nueva intervención")
 
+if case_interaction_closed:
+    st.info(
+        "La participación del caso ya cerró. Puede revisar el hilo, pero no "
+        "registrar nuevas intervenciones."
+    )
+
 possible_parents = {"Ninguna: intervención inicial en este hilo": None}
 for index, post in enumerate(current_posts, start=1):
     fragment = (post.get("content") or "").strip().replace("\n", " ")
@@ -337,12 +356,14 @@ with st.form("discussion_post_form"):
         "Tipo de intervención",
         options=intervention_type_options,
         index=selected_type_index,
+        disabled=case_interaction_closed,
     )
 
     parent_label = st.selectbox(
         "Intervención a la que responde (opcional)",
         options=list(possible_parents.keys()),
         index=selected_parent_index,
+        disabled=case_interaction_closed,
     )
 
     content = st.text_area(
@@ -352,11 +373,15 @@ with st.form("discussion_post_form"):
             "Escriba aquí su intervención. Procure que sea clara, coherente con el rol "
             "y lo bastante sólida para aportar a la discusión."
         ),
+        disabled=case_interaction_closed,
     )
 
-    submitted = st.form_submit_button("Publicar intervención")
+    submitted = st.form_submit_button(
+        "Publicar intervención",
+        disabled=case_interaction_closed,
+    )
 
-if submitted:
+if submitted and not case_interaction_closed:
     clean_content = content.strip()
     parent_id = possible_parents[parent_label]
     clean_intervention_type = (

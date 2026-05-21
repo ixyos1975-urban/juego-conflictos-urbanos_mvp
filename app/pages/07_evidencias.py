@@ -3,6 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 try:
+    from services.case_service import is_case_interaction_closed
     from services.evidence_service import (
         create_evidence,
         get_evidences_for_user,
@@ -10,6 +11,7 @@ try:
     )
     from ui_styles import apply_compact_academic_style
 except ModuleNotFoundError:
+    from app.services.case_service import is_case_interaction_closed
     from app.services.evidence_service import (
         create_evidence,
         get_evidences_for_user,
@@ -74,6 +76,8 @@ if missing_onboarding_steps:
 case_id = st.session_state.get("case_id", "")
 profile_id = st.session_state.get("profile_id", "")
 role_id = st.session_state.get("role_id", "")
+case_record = st.session_state.get("case_record", {}) or {}
+case_interaction_closed = is_case_interaction_closed(case_record)
 
 if not case_id or not profile_id or not role_id:
     st.error(
@@ -81,6 +85,12 @@ if not case_id or not profile_id or not role_id:
         "cargar evidencias."
     )
     st.stop()
+
+if case_interaction_closed:
+    st.warning(
+        "Ejercicio cerrado: las evidencias quedan disponibles en modo solo "
+        "lectura. Ya no es posible registrar nuevos soportes."
+    )
 
 ok_interventions, posts, posts_message = get_interventions_available_for_evidence(
     case_id,
@@ -124,6 +134,12 @@ st.info(
 st.divider()
 st.header("2. Registrar nueva evidencia")
 
+if case_interaction_closed:
+    st.info(
+        "El plazo de participación ya cerró. Puede consultar sus evidencias, "
+        "pero no registrar nuevas."
+    )
+
 possible_posts = {}
 for post in posts:
     content_fragment = (post.get("content") or post.get("title") or "").strip()
@@ -155,38 +171,47 @@ else:
         evidence_type_label = st.selectbox(
             "Tipo de evidencia",
             options=list(evidence_type_options.keys()),
+            disabled=case_interaction_closed,
         )
 
         title = st.text_input(
             "Título breve de la evidencia",
             placeholder="Ejemplo: Artículo sobre permanencia barrial",
+            disabled=case_interaction_closed,
         )
 
         description = st.text_area(
             "Descripción breve",
             height=100,
             placeholder="Explique de manera breve por qué esta evidencia es relevante.",
+            disabled=case_interaction_closed,
         )
 
         reference_text = st.text_area(
             "Referencia o cita breve",
             height=100,
             placeholder="Puede copiar una referencia, cita corta o dato clave.",
+            disabled=case_interaction_closed,
         )
 
         external_url = st.text_input(
             "Enlace externo (opcional)",
             placeholder="https://...",
+            disabled=case_interaction_closed,
         )
 
         linked_post_label = st.selectbox(
             "Intervención asociada (opcional)",
             options=list(possible_posts.keys()),
+            disabled=case_interaction_closed,
         )
 
-        submitted = st.form_submit_button("Guardar evidencia")
+        submitted = st.form_submit_button(
+            "Guardar evidencia",
+            disabled=case_interaction_closed,
+        )
 
-    if submitted:
+    if submitted and not case_interaction_closed:
         clean_title = title.strip()
         clean_description = description.strip()
         clean_reference = reference_text.strip()
