@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import streamlit as st
 
@@ -1075,51 +1075,53 @@ if True:
             else:
                 st.caption("No hay evidencias asociadas a esta intervención.")
 
-    st.write("**Componentes de valoración**")
+    review_form_key = f"teacher_review_form_{selected_preview_intervention_id or 'none'}"
+    with st.form(review_form_key):
+        st.write("**Componentes de valoración**")
 
-    intervention_score = st.selectbox(
-        "Valoración general de la intervención",
-        options=list(rating_options.keys()),
-        index=2,
-    )
-    role_coherence_score = st.selectbox(
-        "Coherencia con el rol",
-        options=list(rating_options.keys()),
-        index=2,
-    )
-    argument_quality_score = st.selectbox(
-        "Calidad argumentativa",
-        options=list(rating_options.keys()),
-        index=2,
-    )
-    evidence_use_score = st.selectbox(
-        "Uso de evidencia y sustento",
-        options=list(rating_options.keys()),
-        index=2,
-    )
+        intervention_score = st.selectbox(
+            "Valoración general de la intervención",
+            options=list(rating_options.keys()),
+            index=2,
+        )
+        role_coherence_score = st.selectbox(
+            "Coherencia con el rol",
+            options=list(rating_options.keys()),
+            index=2,
+        )
+        argument_quality_score = st.selectbox(
+            "Calidad argumentativa",
+            options=list(rating_options.keys()),
+            index=2,
+        )
+        evidence_use_score = st.selectbox(
+            "Uso de evidencia y sustento",
+            options=list(rating_options.keys()),
+            index=2,
+        )
 
-    discussion_result_label = st.selectbox(
-        "Resultado de la discusión",
-        options=list(discussion_result_options.keys()),
-        index=3,
-    )
+        discussion_result_label = st.selectbox(
+            "Resultado de la discusión",
+            options=list(discussion_result_options.keys()),
+            index=3,
+        )
 
-    review_status_label = st.selectbox(
-        "Estado de revisión",
-        options=list(review_status_options.keys()),
-        index=0,
-    )
+        review_status_label = st.selectbox(
+            "Estado de revisión",
+            options=list(review_status_options.keys()),
+            index=0,
+        )
 
-    teacher_comment = st.text_area(
-        "Comentario docente breve",
-        height=120,
-        placeholder=(
-            "Aquí podrá escribirse una retroalimentación breve que complemente "
-            "la valoración cuantitativa."
-        ),
-    )
+        teacher_comment = st.text_area(
+            "Comentario docente breve",
+            height=120,
+            placeholder=(
+                "Aquí podrá escribirse una retroalimentación breve que complemente "
+                "la valoración cuantitativa."
+            ),
+        )
 
-    submitted = st.button("Guardar revisión docente")
+        submitted = st.form_submit_button("Guardar revisión docente")
 
 if submitted:
     selected_intervention_id = (
