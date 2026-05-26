@@ -921,6 +921,69 @@ with st.form("admin_rubric_review_form"):
                 or "Intervención sin texto registrado."
             )
 
+            antecedent_intervention_id = (
+                selected_preview_intervention.get("parent_intervention_id")
+                or selected_preview_intervention.get("reply_to_id")
+                or selected_preview_intervention.get("response_to_id")
+            )
+            antecedent_intervention = None
+            if antecedent_intervention_id:
+                antecedent_intervention = next(
+                    (
+                        intervention
+                        for intervention in review_interventions
+                        if str(
+                            intervention.get("id")
+                            or intervention.get("intervention_id")
+                            or ""
+                        )
+                        == str(antecedent_intervention_id)
+                    ),
+                    None,
+                )
+
+            st.markdown("**Contexto de respuesta**")
+            if antecedent_intervention:
+                st.caption(
+                    "La intervención evaluada responde directamente a la "
+                    "siguiente postura previa."
+                )
+                context1, context2, context3 = st.columns([2, 2, 1])
+                with context1:
+                    st.write(
+                        f"**Autor antecedente:** "
+                        f"{antecedent_intervention.get('author_name') or 'Actor participante'}"
+                    )
+                    st.caption(
+                        f"Rol: {antecedent_intervention.get('role_name') or 'Rol no disponible'}"
+                    )
+                with context2:
+                    st.write(
+                        f"**Hilo:** "
+                        f"{antecedent_intervention.get('thread_title') or 'Hilo sin título'}"
+                    )
+                    st.caption(
+                        "Tipo: "
+                        f"{antecedent_intervention.get('intervention_type') or 'intervención'}"
+                    )
+                with context3:
+                    st.caption(antecedent_intervention.get("created_at") or "Sin fecha")
+
+                st.write(
+                    antecedent_intervention.get("content")
+                    or antecedent_intervention.get("title")
+                    or "Intervención antecedente sin texto registrado."
+                )
+            elif antecedent_intervention_id:
+                st.caption(
+                    "Esta intervención registra una antecedente directa, pero "
+                    "su contenido no está disponible en el listado actual."
+                )
+            else:
+                st.caption(
+                    "Esta intervención no registra una intervención antecedente directa."
+                )
+
             selected_intervention_evidences = []
             if selected_student_profile_id:
                 ok_selected_evidences, selected_student_evidences, selected_evidences_message = (
