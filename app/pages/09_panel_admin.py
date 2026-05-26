@@ -7,7 +7,7 @@ try:
     from services.ai import generate_ai_review_for_intervention
     from services.case_service import get_case_by_slug
     from services.discussion_service import get_case_discussion_summary
-    from services.evidence_service import get_evidence_counts_for_case
+    from services.evidence_service import get_evidence_counts_for_case, get_evidences_for_user
     from services.review_service import (
         get_case_ranking_for_case,
         get_ai_reviews_for_case,
@@ -24,7 +24,7 @@ except ModuleNotFoundError:
     from app.services.ai import generate_ai_review_for_intervention
     from app.services.case_service import get_case_by_slug
     from app.services.discussion_service import get_case_discussion_summary
-    from app.services.evidence_service import get_evidence_counts_for_case
+    from app.services.evidence_service import get_evidence_counts_for_case, get_evidences_for_user
     from app.services.review_service import (
         get_case_ranking_for_case,
         get_ai_reviews_for_case,
@@ -874,6 +874,76 @@ with st.form("admin_rubric_review_form"):
     else:
         selected_intervention_label = None
         st.warning("No hay intervenciones disponibles para revisión docente de este estudiante.")
+
+    selected_preview_intervention_id = (
+        intervention_options.get(selected_intervention_label)
+        if selected_intervention_label
+        else None
+    )
+    selected_preview_intervention = next(
+        (
+            intervention
+            for intervention in filtered_review_interventions
+            if str(intervention.get("id") or intervention.get("intervention_id") or "")
+            == str(selected_preview_intervention_id)
+        ),
+        None,
+    )
+
+    if selected_preview_intervention:
+        st.write("**Intervención seleccionada / texto a evaluar**")
+        with st.container(border=True):
+            meta1, meta2, meta3 = st.columns([2, 2, 1])
+            with meta1:
+                st.write(
+                    f"**Estudiante:** "
+                    f"{selected_preview_intervention.get('author_name') or selected_student}"
+                )
+                st.caption(
+                    f"Rol: {selected_preview_intervention.get('role_name') or 'Rol asignado'}"
+                )
+            with meta2:
+                st.write(
+                    f"**Hilo:** "
+                    f"{selected_preview_intervention.get('thread_title') or 'Hilo sin título'}"
+                )
+                st.caption(
+                    "Tipo: "
+                    f"{selected_preview_intervention.get('intervention_type') or 'intervención'}"
+                )
+            with meta3:
+                st.caption(selected_preview_intervention.get("created_at") or "Sin fecha")
+
+            st.markdown("**Texto completo de la intervención**")
+            st.write(
+                selected_preview_intervention.get("content")
+                or selected_preview_intervention.get("title")
+                or "Intervención sin texto registrado."
+            )
+
+            selected_intervention_evidences = []
+            if selected_student_profile_id:
+                ok_selected_evidences, selected_student_evidences, selected_evidences_message = (
+                    get_evidences_for_user(selected_student_profile_id)
+                )
+                if ok_selected_evidences:
+                    selected_intervention_evidences = [
+                        evidence
+                        for evidence in selected_student_evidences
+                        if str(evidence.get("intervention_id") or "")
+                        == str(selected_preview_intervention_id)
+                    ]
+                else:
+                    st.caption(selected_evidences_message)
+
+            st.markdown("**Evidencias asociadas**")
+            if selected_intervention_evidences:
+                for evidence in selected_intervention_evidences:
+                    st.write(f"- {evidence.get('title') or 'Evidencia sin título'}")
+                    if evidence.get("external_url"):
+                        st.caption(evidence["external_url"])
+            else:
+                st.caption("No hay evidencias asociadas a esta intervención.")
 
     st.write("**Componentes de valoración**")
 
