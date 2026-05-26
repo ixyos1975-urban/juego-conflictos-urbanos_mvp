@@ -842,7 +842,7 @@ filtered_review_interventions = [
     )
 ]
 
-with st.form("admin_rubric_review_form"):
+if True:
     intervention_options = {}
     for intervention in filtered_review_interventions:
         review_state = _review_state_for_intervention(intervention)
@@ -870,6 +870,7 @@ with st.form("admin_rubric_review_form"):
         selected_intervention_label = st.selectbox(
             "Seleccione una intervención para revisar",
             options=list(intervention_options.keys()),
+            key="teacher_review_intervention_selector",
         )
     else:
         selected_intervention_label = None
@@ -1118,7 +1119,7 @@ with st.form("admin_rubric_review_form"):
         ),
     )
 
-    submitted = st.form_submit_button("Guardar revisión docente")
+    submitted = st.button("Guardar revisión docente")
 
 if submitted:
     selected_intervention_id = (
