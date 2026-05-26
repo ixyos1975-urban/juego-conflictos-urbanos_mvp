@@ -431,9 +431,9 @@ def get_ai_reviews_for_case(
         return False, [], interventions_message
 
     intervention_ids = [
-        row.get("id")
+        row.get("id") or row.get("intervention_id")
         for row in interventions
-        if row.get("id")
+        if row.get("id") or row.get("intervention_id")
     ]
 
     if not intervention_ids:
@@ -457,17 +457,22 @@ def get_ai_reviews_for_case(
         )
 
         reviews_by_intervention = {
-            review.get("intervention_id"): review
+            str(review.get("intervention_id")): review
             for review in (reviews_result.data or [])
             if review.get("intervention_id")
         }
 
         enriched = []
         for intervention in interventions:
-            review = reviews_by_intervention.get(intervention.get("id"))
+            intervention_id = intervention.get("id") or intervention.get("intervention_id")
+            if not intervention_id:
+                continue
+
+            review = reviews_by_intervention.get(str(intervention_id))
             if review:
                 enriched.append({
                     **review,
+                    "intervention_id": str(intervention_id),
                     "author_name": intervention.get("author_name", "Estudiante"),
                     "role_name": intervention.get("role_name", "Rol asignado"),
                     "thread_title": intervention.get("thread_title", "Hilo sin titulo"),
