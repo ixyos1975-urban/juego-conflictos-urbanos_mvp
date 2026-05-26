@@ -984,6 +984,72 @@ with st.form("admin_rubric_review_form"):
                     "Esta intervención no registra una intervención antecedente directa."
                 )
 
+            selected_ai_review = ai_reviews_by_intervention.get(
+                str(selected_preview_intervention_id)
+            )
+            st.markdown("**Lectura preliminar AI asociada**")
+            st.caption(
+                "La lectura AI es un apoyo preliminar. La valoración final "
+                "corresponde al docente."
+            )
+            if selected_ai_review:
+                ai_meta1, ai_meta2, ai_meta3 = st.columns(3)
+                with ai_meta1:
+                    st.write(
+                        f"**Moderación:** "
+                        f"{selected_ai_review.get('moderation_status') or 'No definida'}"
+                    )
+                    st.write(
+                        f"**Coherencia de rol:** "
+                        f"{selected_ai_review.get('role_coherence') or 'No definida'}"
+                    )
+                    st.write(
+                        f"**Fuerza argumentativa:** "
+                        f"{selected_ai_review.get('argument_strength') or 'No definida'}"
+                    )
+                with ai_meta2:
+                    st.write(
+                        f"**Tipo de argumento:** "
+                        f"{selected_ai_review.get('argument_type') or 'No definido'}"
+                    )
+                    evidence_label = (
+                        "Sí"
+                        if selected_ai_review.get("evidence_detected") is True
+                        else "No"
+                    )
+                    st.write(f"**Evidencia detectada:** {evidence_label}")
+                    preliminary_score = selected_ai_review.get("preliminary_score")
+                    score_label = (
+                        "No disponible"
+                        if preliminary_score is None
+                        else f"{float(preliminary_score):.2f}"
+                    )
+                    st.write(f"**Puntaje preliminar:** {score_label}")
+                with ai_meta3:
+                    recommendation_label = (
+                        "Sí"
+                        if selected_ai_review.get("teacher_review_recommended") is True
+                        else "No"
+                    )
+                    st.write(
+                        f"**Revisión prioritaria:** {recommendation_label}"
+                    )
+                    st.write(
+                        f"**Prompt:** "
+                        f"{selected_ai_review.get('prompt_version') or 'No registrado'}"
+                    )
+                    st.caption(selected_ai_review.get("created_at") or "Sin fecha")
+
+                st.markdown("**Comentario AI**")
+                st.write(
+                    selected_ai_review.get("ai_comment")
+                    or "La lectura AI no registró comentario."
+                )
+            else:
+                st.caption(
+                    "Esta intervención aún no tiene lectura preliminar AI guardada."
+                )
+
             selected_intervention_evidences = []
             if selected_student_profile_id:
                 ok_selected_evidences, selected_student_evidences, selected_evidences_message = (
