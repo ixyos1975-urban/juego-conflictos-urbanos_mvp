@@ -1202,8 +1202,17 @@ else:
             with r1:
                 st.metric("Posición", row.get("position", "-"))
             with r2:
-                st.write(f"**{row.get('student_name', 'Estudiante')}**")
-                st.caption(row.get("role_name", "Rol asignado"))
+                student_label = (
+                    row.get("full_name")
+                    or row.get("student_name")
+                    or row.get("email")
+                    or "Estudiante"
+                )
+                role_label = row.get("role_name") or "Rol no registrado"
+                st.write(f"**{student_label}**")
+                if row.get("email") and row.get("email") != student_label:
+                    st.caption(row["email"])
+                st.caption(role_label)
             with r3:
                 score = row.get("total_score")
                 score_label = "No disponible" if score is None else f"{float(score):.2f}"

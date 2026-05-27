@@ -595,11 +595,20 @@ def get_case_ranking_for_case(
 
         enriched = []
         for index, row in enumerate(ranking_rows, start=1):
+            student_name = (
+                row.get("student_name")
+                or row.get("full_name")
+                or row.get("email")
+                or "Estudiante"
+            )
+            role_name = row.get("role_name") or "Rol no registrado"
             enriched.append({
                 **row,
                 "position": row.get("position") or index,
-                "student_name": row.get("student_name") or "Estudiante",
-                "role_name": row.get("role_name") or "Rol asignado",
+                "student_name": student_name,
+                "full_name": row.get("full_name") or student_name,
+                "email": row.get("email") or "",
+                "role_name": role_name,
             })
 
         return True, enriched, "Ranking consolidado cargado correctamente."
