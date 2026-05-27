@@ -1170,6 +1170,10 @@ st.caption(
     "Este ranking usa únicamente revisiones docentes con estado validada. "
     "Las lecturas de IA no participan en este cálculo."
 )
+st.caption(
+    "El ranking enriquecido combina calidad docente, participación activa, "
+    "interacción y evidencias. La calidad docente mantiene el mayor peso."
+)
 
 if st.button("Actualizar ranking del caso", use_container_width=True):
     ok_refresh, refreshed_rows, refresh_message = refresh_case_ranking_for_case(case_id)
@@ -1204,6 +1208,64 @@ else:
                 score = row.get("total_score")
                 score_label = "No disponible" if score is None else f"{float(score):.2f}"
                 st.metric("Puntaje consolidado", score_label)
+
+            if row.get("is_provisional") is True:
+                st.warning(
+                    "Ranking provisional: aún hay intervenciones pendientes o en proceso."
+                )
+
+            score1, score2, score3, score4 = st.columns(4)
+            with score1:
+                quality_score = row.get("quality_score")
+                st.metric(
+                    "Calidad docente",
+                    "N/D" if quality_score is None else f"{float(quality_score):.2f}",
+                )
+            with score2:
+                participation_score = row.get("participation_score")
+                st.metric(
+                    "Participación",
+                    (
+                        "N/D"
+                        if participation_score is None
+                        else f"{float(participation_score):.2f}"
+                    ),
+                )
+            with score3:
+                interaction_score = row.get("interaction_score")
+                st.metric(
+                    "Interacción",
+                    (
+                        "N/D"
+                        if interaction_score is None
+                        else f"{float(interaction_score):.2f}"
+                    ),
+                )
+            with score4:
+                evidence_score = row.get("evidence_score")
+                st.metric(
+                    "Evidencias",
+                    "N/D" if evidence_score is None else f"{float(evidence_score):.2f}",
+                )
+
+            count1, count2, count3, count4, count5, count6 = st.columns(6)
+            with count1:
+                st.caption(f"Intervenciones: {row.get('total_interventions', 0)}")
+            with count2:
+                st.caption(f"Réplicas: {row.get('reply_count', 0)}")
+            with count3:
+                st.caption(f"Evidencias: {row.get('evidence_count', 0)}")
+            with count4:
+                st.caption(f"Validadas: {row.get('validated_reviews_count', 0)}")
+            with count5:
+                st.caption(f"Pendientes: {row.get('pending_reviews_count', 0)}")
+            with count6:
+                st.caption(f"En proceso: {row.get('in_process_reviews_count', 0)}")
+
+            st.caption(
+                "Fórmula: "
+                f"{row.get('ranking_formula_version') or 'No registrada'}"
+            )
 
 # ---------------------------------------------------------
 # Cierre y exportación
