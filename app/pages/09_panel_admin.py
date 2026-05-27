@@ -373,31 +373,32 @@ st.write(
     "en términos de participación y estado preliminar del proceso."
 )
 
-if not students:
-    st.warning("Todavía no hay estudiantes con rol asignado para este caso.")
-else:
-    for student in students:
-        with st.container(border=True):
-            a, b, c, d, e = st.columns([2, 2, 1, 1, 1])
-
-            with a:
-                st.write(f"**{student['name']}**")
-                st.caption(student["role"])
-
-            with b:
-                st.write(f"Intervenciones: {student['interventions']}")
-                st.write(f"Evidencias: {student['evidences']}")
-
-            with c:
-                st.write("Estado preliminar")
-                st.write(student["preliminary_status"])
-
-            with d:
-                st.write("Nota final")
-                st.write(student["final_grade"])
-
-            with e:
-                st.button("Ver detalle", key=f"detail_{student['profile_id']}")
+with st.expander("Ver seguimiento general del grupo", expanded=False):
+    if not students:
+        st.warning("Todavía no hay estudiantes con rol asignado para este caso.")
+    else:
+        for student in students:
+            with st.container(border=True):
+                a, b, c, d, e = st.columns([2, 2, 1, 1, 1])
+    
+                with a:
+                    st.write(f"**{student['name']}**")
+                    st.caption(student["role"])
+    
+                with b:
+                    st.write(f"Intervenciones: {student['interventions']}")
+                    st.write(f"Evidencias: {student['evidences']}")
+    
+                with c:
+                    st.write("Estado preliminar")
+                    st.write(student["preliminary_status"])
+    
+                with d:
+                    st.write("Nota final")
+                    st.write(student["final_grade"])
+    
+                with e:
+                    st.button("Ver detalle", key=f"detail_{student['profile_id']}")
 
 # ---------------------------------------------------------
 # Lectura preliminar del sistema
@@ -415,31 +416,32 @@ st.caption(
     "docente, no generan nota final y no alimentan ranking ni consolidación."
 )
 
-if not ai_reviews:
-    st.info("Todavía no hay lecturas preliminares de IA registradas para este caso.")
-else:
-    for item in ai_reviews:
-        with st.container(border=True):
-            x, y, z = st.columns([2, 2, 2])
-
-            with x:
-                st.write(f"**Estudiante:** {item.get('author_name') or 'Estudiante'}")
-                st.caption(item.get("role_name") or "Rol asignado")
-                st.caption(item.get("thread_title") or "Hilo sin título")
-
-            with y:
-                st.write("**Lectura preliminar:**")
-                st.write(f"Fuerza argumentativa: {item.get('argument_strength', 'No definida')}")
-                st.write(f"Tipo: {item.get('argument_type', 'No definido')}")
-                st.write(f"Coherencia de rol: {item.get('role_coherence', 'No definida')}")
-                st.write(f"Moderación: {item.get('moderation_status', 'No definida')}")
-
-            with z:
-                st.write("**Acción docente sugerida:**")
-                if item.get("moderation_status") in ("alerta", "revision"):
-                    st.write("Priorizar revisión docente de esta intervención.")
-                else:
-                    st.write("Usar como insumo preliminar de lectura.")
+with st.expander("Ver lecturas preliminares ya generadas", expanded=False):
+    if not ai_reviews:
+        st.info("Todavía no hay lecturas preliminares de IA registradas para este caso.")
+    else:
+        for item in ai_reviews:
+            with st.container(border=True):
+                x, y, z = st.columns([2, 2, 2])
+    
+                with x:
+                    st.write(f"**Estudiante:** {item.get('author_name') or 'Estudiante'}")
+                    st.caption(item.get("role_name") or "Rol asignado")
+                    st.caption(item.get("thread_title") or "Hilo sin título")
+    
+                with y:
+                    st.write("**Lectura preliminar:**")
+                    st.write(f"Fuerza argumentativa: {item.get('argument_strength', 'No definida')}")
+                    st.write(f"Tipo: {item.get('argument_type', 'No definido')}")
+                    st.write(f"Coherencia de rol: {item.get('role_coherence', 'No definida')}")
+                    st.write(f"Moderación: {item.get('moderation_status', 'No definida')}")
+    
+                with z:
+                    st.write("**Acción docente sugerida:**")
+                    if item.get("moderation_status") in ("alerta", "revision"):
+                        st.write("Priorizar revisión docente de esta intervención.")
+                    else:
+                        st.write("Usar como insumo preliminar de lectura.")
 
 st.write("**Registrar o actualizar lectura preliminar asistida**")
 
