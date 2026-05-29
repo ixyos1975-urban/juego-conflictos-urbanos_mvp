@@ -577,6 +577,11 @@ st.session_state.setdefault("ai_prompt_version", settings.ai_prompt_version)
 
 ai_intervention_options = {}
 ai_intervention_records = {}
+review_interventions_by_id = {
+    str(intervention.get("id") or intervention.get("intervention_id")): intervention
+    for intervention in review_interventions
+    if intervention.get("id") or intervention.get("intervention_id")
+}
 for intervention in review_interventions:
     ai_state = _ai_state_for_intervention(intervention)
     if selected_ai_state_filter and ai_state != selected_ai_state_filter:
@@ -605,6 +610,12 @@ for intervention in review_interventions:
     if label in ai_intervention_options:
         label = f"{label} ({len(ai_intervention_options) + 1})"
 
+    antecedent_intervention_id = intervention.get("parent_intervention_id")
+    antecedent_intervention = (
+        review_interventions_by_id.get(str(antecedent_intervention_id))
+        if antecedent_intervention_id
+        else None
+    )
     normalized_intervention = {
         **intervention,
         "id": str(intervention_id),
@@ -617,6 +628,25 @@ for intervention in review_interventions:
         "thread_title": intervention.get("thread_title") or "Hilo sin titulo",
         "content": intervention.get("content") or intervention.get("title") or "",
     }
+    if antecedent_intervention:
+        normalized_intervention["antecedent_intervention"] = {
+            "id": str(
+                antecedent_intervention.get("id")
+                or antecedent_intervention.get("intervention_id")
+                or antecedent_intervention_id
+            ),
+            "author_name": antecedent_intervention.get("author_name") or "",
+            "author_email": antecedent_intervention.get("author_email") or "",
+            "role_name": antecedent_intervention.get("role_name") or "",
+            "thread_title": antecedent_intervention.get("thread_title") or "",
+            "intervention_type": antecedent_intervention.get("intervention_type") or "",
+            "content": (
+                antecedent_intervention.get("content")
+                or antecedent_intervention.get("title")
+                or ""
+            ),
+            "created_at": antecedent_intervention.get("created_at") or "",
+        }
     ai_intervention_options[label] = str(intervention_id)
     ai_intervention_records[str(intervention_id)] = normalized_intervention
 

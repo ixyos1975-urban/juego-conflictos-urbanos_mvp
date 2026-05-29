@@ -12,6 +12,7 @@ def build_ai_review_prompt(
 ) -> str:
     """Arma un prompt acotado y pide salida JSON estricta."""
     intervention_type = str(intervention.get("intervention_type") or "").strip().lower()
+    antecedent_intervention = intervention.get("antecedent_intervention") or {}
     closure_criteria = ""
     if intervention_type == "cierre":
         closure_criteria = """
@@ -40,6 +41,36 @@ Criterios especificos para cierre estrategico de postura:
   la coherencia contextual, indicalo brevemente en ai_comment como limitacion de
   la lectura.
 """
+    antecedent_context = ""
+    if antecedent_intervention:
+        antecedent_context = f"""
+
+Intervencion antecedente directa:
+- id: {antecedent_intervention.get("id") or "No disponible"}
+- hilo: {antecedent_intervention.get("thread_title") or intervention.get("thread_title") or "Hilo no disponible"}
+- rol: {antecedent_intervention.get("role_name") or "Rol no disponible"}
+- autor: {antecedent_intervention.get("author_name") or antecedent_intervention.get("author_email") or "No disponible"}
+- tipo: {antecedent_intervention.get("intervention_type") or "intervencion"}
+- fecha: {antecedent_intervention.get("created_at") or "No disponible"}
+- contenido: {antecedent_intervention.get("content") or "No disponible"}
+
+Criterios adicionales para respuesta con antecedente:
+- Evalua si la intervencion seleccionada responde realmente al argumento previo
+  y no solo menciona el tema de forma general.
+- Revisa si la respuesta se mantiene dentro del hilo y del problema discutido.
+- Evalua si mantiene una posicion consistente con el rol asignado.
+- Identifica si aporta al desarrollo de la discusion mediante razones nuevas,
+  tension, aclaracion, acuerdo, desacuerdo o condiciones de negociacion.
+- Incluye en ai_comment un resultado argumental preliminar con una de estas
+  etiquetas: gana, empata, pierde o irrelevante.
+- Usa "gana" solo si la respuesta es mas solida, pertinente y coherente que la
+  postura antecedente.
+- Usa "empata" si sostiene una postura valida, pero no supera claramente el
+  argumento anterior.
+- Usa "pierde" si responde de forma debil, poco coherente o desconectada.
+- Usa "irrelevante" si no responde realmente al argumento antecedente o se sale
+  del hilo.
+"""
 
     return f"""
 Genera una lectura preliminar de apoyo docente para una intervencion en un juego
@@ -59,6 +90,7 @@ Intervencion:
 - autor: {intervention.get("author_name") or intervention.get("author_email") or "No disponible"}
 - tipo: {intervention.get("intervention_type") or "intervencion"}
 - contenido: {intervention.get("content") or intervention.get("title") or ""}
+{antecedent_context}
 {closure_criteria}
 
 Devuelve exclusivamente un JSON valido con estas llaves:
