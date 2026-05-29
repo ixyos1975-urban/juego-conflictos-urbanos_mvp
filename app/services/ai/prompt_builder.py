@@ -11,6 +11,36 @@ def build_ai_review_prompt(
     prompt_version: str,
 ) -> str:
     """Arma un prompt acotado y pide salida JSON estricta."""
+    intervention_type = str(intervention.get("intervention_type") or "").strip().lower()
+    closure_criteria = ""
+    if intervention_type == "cierre":
+        closure_criteria = """
+
+Criterios especificos para cierre estrategico de postura:
+- Esta intervencion debe valorarse como cierre de un proceso argumental, no como
+  una intervencion ordinaria ni como una simple respuesta.
+- Revisa si el estudiante retoma elementos del debate en sala y no solo repite
+  una postura aislada.
+- Revisa si identifica acuerdos, desacuerdos o tensiones principales entre
+  actores.
+- Valora si reafirma o ajusta su postura desde el rol asignado.
+- Verifica si plantea una conclusion clara, comprensible, coherente y no
+  generica.
+- Revisa si senala condiciones, limites, acuerdos posibles o escenarios para una
+  posible negociacion.
+- Valora la coherencia contextual con el desarrollo argumental previo del
+  estudiante o del hilo, usando solo el contexto disponible en este prompt.
+- No penalices el cierre solo por no introducir evidencia nueva: en un cierre
+  estrategico pesan especialmente la sintesis, lectura del debate, coherencia con
+  el rol, cierre argumental y condiciones de negociacion.
+- Una intervencion puede estar bien redactada, pero ser debil si no cierra
+  realmente la discusion, si aparece desconectada del hilo o si no muestra
+  relacion clara con el proceso discursivo.
+- Si no cuentas con intervenciones previas suficientes para verificar plenamente
+  la coherencia contextual, indicalo brevemente en ai_comment como limitacion de
+  la lectura.
+"""
+
     return f"""
 Genera una lectura preliminar de apoyo docente para una intervencion en un juego
 de roles urbano. No emitas nota final, ranking ni evaluacion definitiva.
@@ -29,6 +59,7 @@ Intervencion:
 - autor: {intervention.get("author_name") or intervention.get("author_email") or "No disponible"}
 - tipo: {intervention.get("intervention_type") or "intervencion"}
 - contenido: {intervention.get("content") or intervention.get("title") or ""}
+{closure_criteria}
 
 Devuelve exclusivamente un JSON valido con estas llaves:
 {{
