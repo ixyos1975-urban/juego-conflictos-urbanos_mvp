@@ -5,9 +5,10 @@ import streamlit as st
 try:
     from config import settings
     from services.ai import generate_ai_review_for_intervention
-    from services.case_service import get_case_by_slug
+    from services.case_service import get_case_by_slug, is_case_status_closed
     from services.discussion_service import get_case_discussion_summary
     from services.evidence_service import get_evidence_counts_for_case, get_evidences_for_user
+    from services.report_service import build_case_report_excel
     from services.review_service import (
         get_case_ranking_for_case,
         get_ai_reviews_for_case,
@@ -22,9 +23,10 @@ try:
 except ModuleNotFoundError:
     from app.config import settings
     from app.services.ai import generate_ai_review_for_intervention
-    from app.services.case_service import get_case_by_slug
+    from app.services.case_service import get_case_by_slug, is_case_status_closed
     from app.services.discussion_service import get_case_discussion_summary
     from app.services.evidence_service import get_evidence_counts_for_case, get_evidences_for_user
+    from app.services.report_service import build_case_report_excel
     from app.services.review_service import (
         get_case_ranking_for_case,
         get_ai_reviews_for_case,
@@ -1314,25 +1316,120 @@ else:
 st.divider()
 st.header("6. Cierre del ejercicio y reportes")
 
-st.write(
-    "Este bloque queda reservado para el cierre formal del caso y la producción "
-    "de reportes administrativos en una etapa posterior del MVP."
+case_is_closed = is_case_status_closed(case_record)
+case_state_label = "cerrado" if case_is_closed else "abierto"
+st.caption(
+    "Este bloque opera sin cambiar valoraciones, intervenciones ni evidencias. "
+    f"Estado operativo del caso: {case_state_label}."
 )
 
 c1, c2, c3 = st.columns(3)
 
 with c1:
-    st.button("Resultados finales (pendiente)", use_container_width=True)
+    if st.button("Resultados finales", use_container_width=True):
+        ok_refresh, refreshed_rows, refresh_message = refresh_case_ranking_for_case(case_id)
+        if ok_refresh:
+            st.success(f"{refresh_message} Filas actualizadas: {refreshed_rows}.")
+            ok_case_ranking, case_ranking, case_ranking_message = (
+                get_case_ranking_for_case(case_id)
+            )
+            if not ok_case_ranking:
+                st.warning(case_ranking_message)
+                case_ranking = []
+        else:
+            st.error(refresh_message)
+
+    if case_ranking:
+        provisional_rows = [
+            row
+            for row in case_ranking
+            if row.get("is_provisional") is True
+            or int(row.get("pending_reviews_count") or 0) > 0
+            or int(row.get("in_process_reviews_count") or 0) > 0
+        ]
+        formula_versions = sorted({
+            str(row.get("ranking_formula_version") or "No registrada")
+            for row in case_ranking
+        })
+        st.metric("Registros en ranking", len(case_ranking))
+        st.caption("Fórmula: " + ", ".join(formula_versions))
+        if provisional_rows:
+            st.warning(
+                "Ranking provisional: hay revisiones pendientes o en proceso."
+            )
+        elif case_is_closed:
+            st.success("Ranking final disponible para el caso cerrado.")
+        else:
+            st.info("Ranking consolidado disponible; el caso aún no está cerrado.")
+    else:
+        st.info("Aún no hay ranking consolidado para cerrar resultados.")
 
 with c2:
-    st.button("Entrega al estudiante (pendiente)", use_container_width=True)
+    if st.button("Entrega al estudiante", use_container_width=True):
+        if not case_is_closed:
+            st.warning(
+                "El caso aún no está cerrado. La visualización de resultados "
+                "individuales no queda habilitada todavía."
+            )
+        elif not case_ranking:
+            st.warning(
+                "El caso está cerrado, pero aún no hay ranking consolidado para "
+                "entregar resultados."
+            )
+        else:
+            provisional_rows = [
+                row
+                for row in case_ranking
+                if row.get("is_provisional") is True
+                or int(row.get("pending_reviews_count") or 0) > 0
+                or int(row.get("in_process_reviews_count") or 0) > 0
+            ]
+            if provisional_rows:
+                st.warning(
+                    "Los estudiantes pueden consultar su resultado individual, "
+                    "pero debe mostrarse como provisional."
+                )
+            else:
+                st.success(
+                    "Los estudiantes pueden consultar su resultado individual final "
+                    "en la pantalla Resultados del estudiante."
+                )
+        st.caption(
+            "La entrega no publica un ranking completo al estudiante: cada usuario "
+            "solo consulta su propio registro de case_ranking."
+        )
 
 with c3:
-    st.button("Reporte Excel (pendiente)", use_container_width=True)
+    if st.button("Reporte Excel", use_container_width=True):
+        ok_report, report_bytes, report_message = build_case_report_excel(case_id)
+        if ok_report:
+            st.session_state["admin_case_report_bytes"] = report_bytes
+            st.session_state["admin_case_report_message"] = report_message
+        else:
+            st.session_state.pop("admin_case_report_bytes", None)
+            st.error(report_message)
+
+    report_bytes = st.session_state.get("admin_case_report_bytes")
+    if report_bytes:
+        st.success(st.session_state.get(
+            "admin_case_report_message",
+            "Reporte Excel generado correctamente.",
+        ))
+        st.download_button(
+            "Descargar Excel",
+            data=report_bytes,
+            file_name=f"reporte_admin_{case_slug}.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            use_container_width=True,
+        )
 
 st.caption(
-    "Funcionalidad pendiente: estos controles aún no ejecutan cierre formal, "
-    "entrega de resultados ni exportación."
+    "El cierre operativo refresca y muestra ranking, la entrega usa el estado "
+    "cerrado del caso como condición mínima, y el reporte se genera en memoria "
+    "sin escribir datos en Supabase."
 )
 
 # ---------------------------------------------------------

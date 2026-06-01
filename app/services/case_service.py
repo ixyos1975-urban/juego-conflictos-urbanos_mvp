@@ -44,13 +44,18 @@ def _safe_float(value: Any) -> Optional[float]:
 
 def is_case_interaction_closed(case_record: Optional[Dict[str, Any]]) -> bool:
     """Indica si el estudiante debe quedar en modo solo lectura."""
-    case_record = case_record or {}
-    status = str(case_record.get("status") or "").strip().lower()
-
-    if status in CASE_CLOSED_STATUSES:
+    if is_case_status_closed(case_record):
         return True
 
     return datetime.now(COLOMBIA_TZ) >= CASE_INTERACTION_CLOSES_AT
+
+
+def is_case_status_closed(case_record: Optional[Dict[str, Any]]) -> bool:
+    """Indica si el caso fue cerrado formalmente por su estado persistido."""
+    case_record = case_record or {}
+    status = str(case_record.get("status") or "").strip().lower()
+
+    return status in CASE_CLOSED_STATUSES
 
 
 def get_case_by_slug(case_slug: str) -> Tuple[bool, Optional[Dict[str, Any]], str]:

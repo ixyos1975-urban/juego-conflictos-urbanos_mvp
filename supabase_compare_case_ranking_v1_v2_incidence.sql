@@ -289,6 +289,11 @@ v2_inputs as (
     select
         sb.case_id,
         sb.user_id,
+        (
+            coalesce(sa.total_interventions, 0) > 0
+            or coalesce(rs.validated_reviews_count, 0) > 0
+            or coalesce(sa.evidence_count, 0) > 0
+        ) as has_real_activity,
         case
             when coalesce(sa.total_interventions, 0) = 0 then 0.0
             when sa.total_interventions = 1 then 1.5
@@ -356,31 +361,40 @@ v2_scores as (
     select
         sb.case_id,
         sb.user_id,
-        round(
-            (
-                vi.participation_quantity_score * 0.40
-                + coalesce(rs.quality_score, 0) * 0.40
-                + vi.validated_coverage_score * 0.20
-            )::numeric,
-            2
-        ) as participation_incidence_score_v2,
-        round(
-            (
-                vi.reply_quantity_score * 0.25
-                + coalesce(rrs.avg_reply_discussion_score, 0) * 0.25
-                + coalesce(rrs.avg_reply_argument_quality_score, 0) * 0.20
-                + coalesce(das.dialogic_attention_score, 3.5) * 0.30
-            )::numeric,
-            2
-        ) as interaction_pertinence_score_v2,
-        round(
-            (
-                vi.evidence_quantity_score * 0.30
-                + coalesce(ers.avg_evidence_argument_score, rs.avg_evidence_use_score, 0) * 0.50
-                + vi.evidence_coverage_score * 0.20
-            )::numeric,
-            2
-        ) as evidence_argument_score_v2
+        case
+            when vi.has_real_activity is not true then 0.0
+            else round(
+                (
+                    vi.participation_quantity_score * 0.40
+                    + coalesce(rs.quality_score, 0) * 0.40
+                    + vi.validated_coverage_score * 0.20
+                )::numeric,
+                2
+            )
+        end as participation_incidence_score_v2,
+        case
+            when vi.has_real_activity is not true then 0.0
+            else round(
+                (
+                    vi.reply_quantity_score * 0.25
+                    + coalesce(rrs.avg_reply_discussion_score, 0) * 0.25
+                    + coalesce(rrs.avg_reply_argument_quality_score, 0) * 0.20
+                    + coalesce(das.dialogic_attention_score, 3.5) * 0.30
+                )::numeric,
+                2
+            )
+        end as interaction_pertinence_score_v2,
+        case
+            when vi.has_real_activity is not true then 0.0
+            else round(
+                (
+                    vi.evidence_quantity_score * 0.30
+                    + coalesce(ers.avg_evidence_argument_score, rs.avg_evidence_use_score, 0) * 0.50
+                    + vi.evidence_coverage_score * 0.20
+                )::numeric,
+                2
+            )
+        end as evidence_argument_score_v2
     from student_base sb
     join v2_inputs vi
         on vi.case_id = sb.case_id
@@ -403,6 +417,14 @@ comparison as (
         sb.email,
         sb.full_name,
         sb.role_name,
+        (
+            coalesce(sa.total_interventions, 0) > 0
+            or coalesce(rs.validated_reviews_count, 0) > 0
+            or coalesce(sa.evidence_count, 0) > 0
+        ) as has_real_activity,
+        lower(coalesce(sb.email, '')) in (
+            'alumno1@unisalle.edu.co'
+        ) as is_demo_candidate,
         coalesce(sa.total_interventions, 0) as total_interventions,
         coalesce(sa.reply_count, 0) as reply_count,
         coalesce(rms.replies_made, 0) as replies_made,
@@ -429,15 +451,22 @@ comparison as (
         v2.participation_incidence_score_v2,
         v2.interaction_pertinence_score_v2,
         v2.evidence_argument_score_v2,
-        round(
-            (
-                coalesce(rs.quality_score, 0) * 0.65
-                + v2.participation_incidence_score_v2 * 0.15
-                + v2.interaction_pertinence_score_v2 * 0.12
-                + v2.evidence_argument_score_v2 * 0.08
-            )::numeric,
-            2
-        ) as total_score_v2
+        case
+            when (
+                coalesce(sa.total_interventions, 0) = 0
+                and coalesce(rs.validated_reviews_count, 0) = 0
+                and coalesce(sa.evidence_count, 0) = 0
+            ) then 0.0
+            else round(
+                (
+                    coalesce(rs.quality_score, 0) * 0.65
+                    + v2.participation_incidence_score_v2 * 0.15
+                    + v2.interaction_pertinence_score_v2 * 0.12
+                    + v2.evidence_argument_score_v2 * 0.08
+                )::numeric,
+                2
+            )
+        end as total_score_v2
     from student_base sb
     left join student_activity sa
         on sa.case_id = sb.case_id
@@ -468,6 +497,8 @@ select
     email,
     full_name,
     role_name,
+    has_real_activity,
+    is_demo_candidate,
     total_interventions,
     reply_count,
     replies_made,

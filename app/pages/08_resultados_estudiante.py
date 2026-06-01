@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 try:
-    from services.case_service import get_case_by_slug
+    from services.case_service import get_case_by_slug, is_case_status_closed
     from services.discussion_service import get_student_participation_summary
     from services.evidence_service import get_evidences_for_user
     from services.profile_service import get_profile_for_user_case, normalize_profile_data
@@ -13,7 +13,7 @@ try:
     )
     from ui_styles import apply_compact_academic_style
 except ModuleNotFoundError:
-    from app.services.case_service import get_case_by_slug
+    from app.services.case_service import get_case_by_slug, is_case_status_closed
     from app.services.discussion_service import get_student_participation_summary
     from app.services.evidence_service import get_evidences_for_user
     from app.services.profile_service import get_profile_for_user_case, normalize_profile_data
@@ -230,6 +230,29 @@ current_case = {
     "phase": case_record.get("phase") or "Apertura",
     "status": case_record.get("status") or "Activo",
 }
+case_is_closed = is_case_status_closed(case_record)
+
+if not case_is_closed:
+    st.warning("Resultado aún no disponible.")
+    st.info(
+        "Los resultados individuales se habilitan cuando el caso está cerrado "
+        "y el panel administrativo consolida el ranking."
+    )
+    st.stop()
+
+if not case_ranking_record:
+    st.warning("Resultado aún no disponible.")
+    st.info(
+        "El resultado individual aparecerá cuando el panel administrativo "
+        "consolide el ranking del caso."
+    )
+    st.stop()
+
+result_is_provisional = (
+    case_ranking_record.get("is_provisional") is True
+    or int(case_ranking_record.get("pending_reviews_count") or 0) > 0
+    or int(case_ranking_record.get("in_process_reviews_count") or 0) > 0
+)
 
 result_components = [
     {
@@ -317,7 +340,16 @@ final_feedback = (
     )
 )
 
-st.success("Flujo correcto: el estudiante ya puede consultar la lectura general de sus resultados.")
+if result_is_provisional:
+    st.warning(
+        "Resultado provisional: el caso aún puede tener revisiones pendientes, "
+        "en proceso o no estar cerrado formalmente."
+    )
+else:
+    st.success(
+        "Resultado final disponible: el caso está cerrado y el ranking individual "
+        "ya fue consolidado."
+    )
 
 # ---------------------------------------------------------
 # Encabezado general
@@ -357,6 +389,13 @@ with res3:
     st.metric("Posición global", ranking_position)
 
 st.write(f"**Estado de revisión docente:** {review_status}")
+if result_is_provisional:
+    st.warning(
+        "Este resultado se entrega como provisional. Puede cambiar si el equipo "
+        "docente valida revisiones pendientes o actualiza el ranking."
+    )
+else:
+    st.success("Este resultado se entrega como final para el caso cerrado.")
 
 st.info(
     "La nota final combina lectura cuantitativa y cualitativa. "
