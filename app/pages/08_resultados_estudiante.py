@@ -8,6 +8,7 @@ try:
     from services.evidence_service import get_evidences_for_user
     from services.profile_service import get_profile_for_user_case, normalize_profile_data
     from services.review_service import (
+        get_ai_reviews_for_case,
         get_case_ranking_for_student,
         get_teacher_reviews_for_student,
     )
@@ -18,6 +19,7 @@ except ModuleNotFoundError:
     from app.services.evidence_service import get_evidences_for_user
     from app.services.profile_service import get_profile_for_user_case, normalize_profile_data
     from app.services.review_service import (
+        get_ai_reviews_for_case,
         get_case_ranking_for_student,
         get_teacher_reviews_for_student,
     )
@@ -153,6 +155,21 @@ if not ok_ranking:
     st.warning(ranking_message)
     case_ranking_record = None
 
+reviewed_intervention_ids = {
+    str(review.get("intervention_id"))
+    for review in teacher_reviews
+    if review.get("intervention_id")
+}
+ok_ai_reviews, ai_reviews_for_case, ai_reviews_message = get_ai_reviews_for_case(case_id)
+if ok_ai_reviews:
+    ai_reviews = [
+        review
+        for review in ai_reviews_for_case
+        if str(review.get("intervention_id") or "") in reviewed_intervention_ids
+    ]
+else:
+    ai_reviews = []
+
 rating_labels = {
     "excelente": "Excelente",
     "sobresaliente": "Sobresaliente",
@@ -225,6 +242,122 @@ def _has_validated_closure_review(rows: list[dict]) -> bool:
         and str(row.get("intervention_type") or "").strip().lower() in closure_types
         for row in rows
     )
+
+
+def _teacher_comments(rows: list[dict], limit: int = 2) -> list[str]:
+    sorted_rows = sorted(
+        rows,
+        key=lambda row: (
+            str(row.get("review_status") or "").strip().lower() != "validada",
+            str(row.get("reviewed_at") or ""),
+        ),
+        reverse=False,
+    )
+    comments = []
+    for row in sorted_rows:
+        comment = str(row.get("teacher_comment") or "").strip()
+        if comment and comment not in comments:
+            comments.append(comment)
+        if len(comments) >= limit:
+            break
+    return comments
+
+
+def _component_strengths_and_improvements(
+    components: list[dict],
+) -> tuple[list[str], list[str], str | None, str | None]:
+    scored_components = [
+        component
+        for component in components
+        if component.get("applies") is not False
+        and component.get("score") is not None
+    ]
+
+    strengths = []
+    improvements = []
+    main_strength = None
+    main_improvement = None
+
+    if scored_components:
+        best_component = max(scored_components, key=lambda component: component["score"])
+        lowest_component = min(scored_components, key=lambda component: component["score"])
+        main_strength = str(best_component["name"])
+        main_improvement = str(lowest_component["name"])
+
+    for component in scored_components:
+        score = float(component["score"])
+        name = str(component["name"])
+        if score >= 4.0:
+            strengths.append(
+                f"{name}: desempeño alto según revisión docente ({score:.1f}/5)."
+            )
+        elif score < 3.5:
+            improvements.append(
+                f"{name}: conviene reforzarlo según revisión docente ({score:.1f}/5)."
+            )
+
+    if not strengths and main_strength:
+        best = next(
+            component for component in scored_components
+            if component["name"] == main_strength
+        )
+        strengths.append(
+            f"{main_strength}: es el componente comparativamente más sólido "
+            f"en la revisión disponible ({float(best['score']):.1f}/5)."
+        )
+
+    if not improvements and main_improvement:
+        lowest = next(
+            component for component in scored_components
+            if component["name"] == main_improvement
+        )
+        improvements.append(
+            f"{main_improvement}: es el principal foco de mejora relativa "
+            f"({float(lowest['score']):.1f}/5)."
+        )
+
+    return strengths[:3], improvements[:3], main_strength, main_improvement
+
+
+def _ai_support_notes(rows: list[dict], limit: int = 2) -> list[str]:
+    notes = []
+    for row in rows:
+        comment = str(row.get("ai_comment") or "").strip()
+        if comment:
+            notes.append(f"Apoyo IA preliminar: {comment}")
+        elif row.get("preliminary_score") is not None:
+            notes.append(
+                "Apoyo IA preliminar disponible con puntaje "
+                f"{float(row['preliminary_score']):.1f}/5."
+            )
+        if len(notes) >= limit:
+            break
+    return notes
+
+
+def _build_final_feedback(
+    teacher_comments: list[str],
+    main_strength: str | None,
+    main_improvement: str | None,
+    ranking_record: dict | None,
+) -> str:
+    if teacher_comments:
+        base = teacher_comments[0]
+    elif main_strength or main_improvement:
+        base = "La lectura disponible se apoya en los puntajes docentes por componente."
+    elif ranking_record and ranking_record.get("total_score") is not None:
+        base = "La lectura disponible se apoya en el resultado consolidado del ranking."
+    else:
+        return (
+            "Aún no hay información suficiente para construir una retroalimentación "
+            "formativa final."
+        )
+
+    recommendation = (
+        f"Como siguiente paso, conviene sostener {main_strength or 'las fortalezas visibles'} "
+        f"y trabajar de forma concreta en {main_improvement or 'el componente con menor evidencia'}."
+    )
+    return f"{base} {recommendation}"
 
 
 reviews_with_score = [
@@ -350,19 +483,35 @@ ranking_position = (
     if case_ranking_record and case_ranking_record.get("position") is not None
     else "No disponible todavía"
 )
-review_comments = [
-    str(review.get("teacher_comment", "")).strip()
-    for review in teacher_reviews
-    if str(review.get("teacher_comment", "")).strip()
-]
-final_feedback = (
-    review_comments[0]
-    if review_comments
-    else (
-        "La retroalimentación evaluativa final todavía no está disponible. "
-        "Cuando existan comentarios docentes guardados, aquí aparecerá "
-        "una lectura cualitativa del proceso."
+review_comments = _teacher_comments(teacher_reviews)
+strengths, improvements, main_strength, main_improvement = (
+    _component_strengths_and_improvements(result_components)
+)
+
+if review_comments:
+    strengths.insert(
+        0,
+        "Comentario docente disponible como fuente principal de lectura cualitativa.",
     )
+
+if ai_reviews:
+    ai_notes = _ai_support_notes(ai_reviews)
+    for note in ai_notes:
+        if len(improvements) < 3:
+            improvements.append(note)
+
+if case_ranking_record and case_ranking_record.get("total_score") is not None:
+    if len(strengths) < 3:
+        strengths.append(
+            "Resultado consolidado disponible en case_ranking "
+            f"({float(case_ranking_record['total_score']):.2f}/5)."
+        )
+
+final_feedback = _build_final_feedback(
+    review_comments,
+    main_strength,
+    main_improvement,
+    case_ranking_record,
 )
 
 if result_is_provisional:
@@ -497,19 +646,19 @@ st.info(
 st.divider()
 st.header("3. Lectura pedagógica del desempeño")
 
-st.markdown(
-    """
-    Esta lectura ayuda a responder preguntas como:
-
-    - ¿cómo me fue en general?  
-    - ¿en qué componente tuve mejor desempeño?  
-    - ¿qué aspecto debería fortalecer si hubiera una nueva ronda?  
-    - ¿mi principal fortaleza estuvo en el rol, el argumento, la evidencia o la interacción?
-    """
+st.write(
+    "Esta lectura se construye con prioridad en comentarios y valoraciones "
+    "docentes; luego usa puntajes por componente, lecturas IA preliminares si "
+    "están disponibles y datos consolidados del ranking individual."
 )
 
-strengths = []
-improvements = []
+if review_comments:
+    st.caption("Fuente docente destacada: " + review_comments[0])
+elif not strengths and not improvements:
+    st.caption(
+        "Aún no hay datos suficientes para identificar fortalezas o aspectos "
+        "por fortalecer de forma sustentada."
+    )
 
 col1, col2 = st.columns(2)
 
