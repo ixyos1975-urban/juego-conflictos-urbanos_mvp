@@ -212,6 +212,21 @@ def _to_float(value: object) -> float | None:
         return None
 
 
+def _has_validated_closure_review(rows: list[dict]) -> bool:
+    closure_types = {
+        "cierre",
+        "cierre_estrategico",
+        "cierre estratégico",
+        "conclusion",
+        "conclusión",
+    }
+    return any(
+        str(row.get("review_status") or "").strip().lower() == "validada"
+        and str(row.get("intervention_type") or "").strip().lower() in closure_types
+        for row in rows
+    )
+
+
 reviews_with_score = [
     review
     for review in teacher_reviews
@@ -224,6 +239,7 @@ review_status = review_status_labels.get(
     "Sin revisión docente",
 )
 review_count = len(teacher_reviews)
+has_validated_closure_review = _has_validated_closure_review(teacher_reviews)
 
 current_case = {
     "title": case_record.get("title") or validated_user.get("case_slug", "Caso activo"),
@@ -260,6 +276,7 @@ result_components = [
         "score": _average_score(teacher_reviews, "role_coherence_score"),
         "label": _component_label(teacher_reviews, "role_coherence_rating"),
         "weight": "20%",
+        "applies": True,
         "progress": _progress_from_score(
             _average_score(teacher_reviews, "role_coherence_score")
         ),
@@ -269,6 +286,7 @@ result_components = [
         "score": _average_score(teacher_reviews, "argument_quality_score"),
         "label": _component_label(teacher_reviews, "argument_quality_rating"),
         "weight": "25%",
+        "applies": True,
         "progress": _progress_from_score(
             _average_score(teacher_reviews, "argument_quality_score")
         ),
@@ -278,6 +296,7 @@ result_components = [
         "score": _average_score(teacher_reviews, "evidence_use_score"),
         "label": _component_label(teacher_reviews, "evidence_use_rating"),
         "weight": "20%",
+        "applies": True,
         "progress": _progress_from_score(
             _average_score(teacher_reviews, "evidence_use_score")
         ),
@@ -290,6 +309,7 @@ result_components = [
             "Pendiente de evaluación",
         ),
         "weight": "20%",
+        "applies": True,
         "progress": _progress_from_score(
             _average_score(teacher_reviews, "discussion_result_score")
         ),
@@ -297,8 +317,13 @@ result_components = [
     {
         "name": "Desarrollo estratégico del proceso y cierre",
         "score": None,
-        "label": "Pendiente de evaluación",
-        "weight": "15%",
+        "label": (
+            "Pendiente de evaluación"
+            if has_validated_closure_review
+            else "No aplicado en esta versión del ejercicio"
+        ),
+        "weight": "15%" if has_validated_closure_review else "No aplicado",
+        "applies": has_validated_closure_review,
         "progress": 0,
     },
 ]
@@ -429,20 +454,42 @@ for component in result_components:
 
         with top1:
             st.write(f"**{component['name']}**")
-            st.caption(f"Peso dentro de la nota final: {component['weight']}")
+            if component.get("applies") is False:
+                st.caption("Componente no incluido en la valoración visible actual")
+            else:
+                st.caption(f"Peso dentro de la nota final: {component['weight']}")
 
         with top2:
-            score_label = "Pendiente" if component["score"] is None else f"{component['score']:.1f}"
+            if component.get("applies") is False:
+                score_label = "No aplicado"
+            else:
+                score_label = (
+                    "Pendiente"
+                    if component["score"] is None
+                    else f"{component['score']:.1f}"
+                )
             st.metric("Puntaje", score_label)
 
         with top3:
             st.metric("Lectura cualitativa", component["label"])
 
         st.progress(component["progress"] / 100.0)
-        if component["score"] is None:
+        if component.get("applies") is False:
+            st.caption(
+                "Este componente no se califica ni se promedia para la lectura "
+                "visible de este ejercicio."
+            )
+        elif component["score"] is None:
             st.caption("Desempeño equivalente: pendiente de evaluación")
         else:
             st.caption(f"Desempeño equivalente: {component['label']}")
+
+st.info(
+    "El componente de cierre estratégico no fue aplicado en esta versión del "
+    "ejercicio. La valoración visible se calcula con los componentes "
+    "efectivamente desarrollados. En próximos ejercicios, el cierre estratégico "
+    "será un criterio obligatorio."
+)
 
 # ---------------------------------------------------------
 # Lectura pedagógica del resultado
